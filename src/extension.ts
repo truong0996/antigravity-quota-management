@@ -15,16 +15,73 @@ export function activate(context: vscode.ExtensionContext) {
     log.appendLine("Extension activated.");
 
     quotaProvider = new QuotaProvider();
-    vscode.window.registerTreeDataProvider('quota-view', quotaProvider);
 
-    context.subscriptions.push(vscode.commands.registerCommand('quota-view.refreshEntry', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('antigravity-quotas.refresh', () => {
         log.appendLine("Manual refresh requested.");
         quotaProvider.manualRefresh();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('antigravity-quotas.show', () => {
-        log.appendLine("Show quotas command executed.");
-        vscode.commands.executeCommand('quota-view.focus');
+    context.subscriptions.push(vscode.commands.registerCommand('antigravity-quotas.show', async () => {
+        log.appendLine("Show quotas menu command executed.");
+
+        const models = quotaProvider.getModels();
+        const items: (vscode.QuickPickItem & { action?: () => void })[] = [
+            {
+                label: "$(refresh) Refresh Quotas",
+                description: quotaProvider.getRefreshStatus(),
+                action: () => vscode.commands.executeCommand('antigravity-quotas.refresh')
+            },
+            {
+                label: "$(edit) Set Nickname for Model",
+                action: () => vscode.commands.executeCommand('antigravity-quotas.setNickname')
+            },
+            { label: "", kind: vscode.QuickPickItemKind.Separator }
+        ];
+
+        const nicknames = vscode.workspace.getConfiguration('antigravityQuotas').get<any>('modelNicknames', {});
+
+        models.forEach(m => {
+            const perc = Math.round((m.quotaInfo?.remainingFraction ?? 1) * 100);
+            const nickname = nicknames[m.label];
+            const label = nickname ? `${nickname} (${m.label})` : m.label;
+
+            let resetInfo = "";
+            if (m.quotaInfo?.resetTime) {
+                resetInfo = ` • Resets in ${quotaProvider.formatRelativeTime(m.quotaInfo.resetTime)}`;
+            }
+
+            items.push({
+                label: `${perc}% - ${label}`,
+                description: resetInfo,
+                detail: m.label,
+                action: async () => {
+                    const nick = await vscode.window.showInputBox({
+                        placeHolder: 'Enter nickname (leave empty to reset)',
+                        prompt: `Nickname for ${m.label}`,
+                        value: nicknames[m.label] || ""
+                    });
+                    if (nick !== undefined) {
+                        const config = vscode.workspace.getConfiguration('antigravityQuotas');
+                        const nicks: any = { ...config.get('modelNicknames', {}) };
+                        if (nick === '') {
+                            delete nicks[m.label];
+                        } else {
+                            nicks[m.label] = nick;
+                        }
+                        await config.update('modelNicknames', nicks, vscode.ConfigurationTarget.Global);
+                        quotaProvider.updateStatusBar();
+                    }
+                }
+            });
+        });
+
+        const selected = await vscode.window.showQuickPick(items, {
+            placeHolder: 'Antigravity Quotas'
+        });
+
+        if (selected && selected.action) {
+            selected.action();
+        }
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('antigravity-quotas.setNickname', async () => {
@@ -39,7 +96,8 @@ export function activate(context: vscode.ExtensionContext) {
         if (modelPick) {
             const nick = await vscode.window.showInputBox({
                 placeHolder: 'Enter nickname (leave empty to reset)',
-                prompt: `Nickname for ${modelPick}`
+                prompt: `Nickname for ${modelPick}`,
+                value: vscode.workspace.getConfiguration('antigravityQuotas').get<any>('modelNicknames', {})[modelPick] || ""
             });
             if (nick !== undefined) {
                 const config = vscode.workspace.getConfiguration('antigravityQuotas');
@@ -50,6 +108,7 @@ export function activate(context: vscode.ExtensionContext) {
                     nicknames[modelPick] = nick;
                 }
                 await config.update('modelNicknames', nicknames, vscode.ConfigurationTarget.Global);
+                quotaProvider.updateStatusBar();
             }
         }
     }));
@@ -63,9 +122,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(log);
 }
 
-class QuotaProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
-    private _onDidChangeTreeData = new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
-    readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+class QuotaProvider {
     private nextFetchTime = Date.now();
     private cachedModels: any[] = [];
     private isRefreshing = false;
@@ -75,14 +132,18 @@ class QuotaProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
         setInterval(() => {
             if (Date.now() >= this.nextFetchTime && !this.isRefreshing) {
                 this.refresh();
-            } else {
-                this._onDidChangeTreeData.fire();
             }
             this.updateStatusBar();
         }, FAST_TIMER_MS);
     }
 
     getModels() { return this.cachedModels; }
+
+    getRefreshStatus(): string {
+        if (this.isRefreshing) return "Refreshing...";
+        const secondsLeft = Math.max(0, Math.floor((this.nextFetchTime - Date.now()) / 1000));
+        return `Next check in: ${Math.floor(secondsLeft / 60)}:${(secondsLeft % 60).toString().padStart(2, '0')}`;
+    }
 
     async manualRefresh() {
         this.nextFetchTime = Date.now();
@@ -92,7 +153,6 @@ class QuotaProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     async refresh() {
         if (this.isRefreshing) return;
         this.isRefreshing = true;
-        this._onDidChangeTreeData.fire();
 
         try {
             log.appendLine(`Fetching quotas at ${new Date().toLocaleTimeString()}...`);
@@ -107,7 +167,6 @@ class QuotaProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
             this.nextFetchTime = Date.now() + 30000;
         } finally {
             this.isRefreshing = false;
-            this._onDidChangeTreeData.fire();
             this.updateStatusBar();
         }
     }
@@ -194,7 +253,7 @@ class QuotaProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
         });
     }
 
-    private formatRelativeTime(isoString: string): string {
+    public formatRelativeTime(isoString: string): string {
         try {
             const resetDate = new Date(isoString);
             const now = new Date();
@@ -214,52 +273,6 @@ class QuotaProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
         } catch (e) {
             return "N/A";
         }
-    }
-
-    getTreeItem(element: vscode.TreeItem) { return element; }
-
-    async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
-        if (element) return [];
-
-        const items: vscode.TreeItem[] = [];
-
-        const secondsLeft = Math.max(0, Math.floor((this.nextFetchTime - Date.now()) / 1000));
-        const timerItem = new vscode.TreeItem(
-            this.isRefreshing ? "Refreshing..." : `Next check in: ${Math.floor(secondsLeft / 60)}:${(secondsLeft % 60).toString().padStart(2, '0')}`
-        );
-        timerItem.iconPath = new vscode.ThemeIcon(this.isRefreshing ? 'sync~spin' : 'watch');
-        items.push(timerItem);
-
-        if (this.lastError && this.cachedModels.length === 0) {
-            const errItem = new vscode.TreeItem(this.lastError);
-            errItem.iconPath = new vscode.ThemeIcon('error', new vscode.ThemeColor('charts.red'));
-            errItem.tooltip = "Ensure the Antigravity model server (language_server) is running.";
-            items.push(errItem);
-        }
-
-        const nicknames = vscode.workspace.getConfiguration('antigravityQuotas').get<any>('modelNicknames', {});
-
-        const modelItems = this.cachedModels.map(m => {
-            const perc = Math.round((m.quotaInfo?.remainingFraction ?? 1) * 100);
-            const nickname = nicknames[m.label];
-            const label = nickname ? `${nickname} (${m.label})` : m.label;
-            const item = new vscode.TreeItem(label);
-            item.description = `${perc}% remaining`;
-            const filled = Math.round(perc / 10);
-
-            let resetInfo = "";
-            if (m.quotaInfo?.resetTime) {
-                const absTime = new Date(m.quotaInfo.resetTime).toLocaleString();
-                resetInfo = `\nResets in: ${this.formatRelativeTime(m.quotaInfo.resetTime)} (${absTime})`;
-            }
-            item.tooltip = `${'█'.repeat(filled)}${'░'.repeat(10 - filled)} ${perc}%${resetInfo}`;
-
-            item.iconPath = new vscode.ThemeIcon(perc > 50 ? 'check' : (perc > 20 ? 'warning' : 'error'),
-                new vscode.ThemeColor(perc > 50 ? 'charts.green' : (perc > 20 ? 'charts.yellow' : 'charts.red')));
-            return item;
-        });
-
-        return [...items, ...modelItems];
     }
 
     private async fetchQuotas(): Promise<any[]> {

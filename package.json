@@ -51,26 +51,9 @@
                 }
             }
         },
-        "viewsContainers": {
-            "activitybar": [
-                {
-                    "id": "antigravity-quotas",
-                    "title": "Antigravity Quotas",
-                    "icon": "$(dashboard)"
-                }
-            ]
-        },
-        "views": {
-            "antigravity-quotas": [
-                {
-                    "id": "quota-view",
-                    "name": "Model Quotas"
-                }
-            ]
-        },
         "commands": [
             {
-                "command": "quota-view.refreshEntry",
+                "command": "antigravity-quotas.refresh",
                 "title": "Refresh Quotas",
                 "icon": "$(refresh)"
             },
@@ -84,14 +67,10 @@
             }
         ],
         "menus": {
-            "view/title": [
-                {
-                    "command": "quota-view.refreshEntry",
-                    "when": "view == quota-view",
-                    "group": "navigation"
-                }
-            ],
             "commandPalette": [
+                {
+                    "command": "antigravity-quotas.refresh"
+                },
                 {
                     "command": "antigravity-quotas.show"
                 },
