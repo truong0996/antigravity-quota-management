@@ -1,0 +1,117 @@
+{
+    "name": "antigravity-quotas",
+    "displayName": "Antigravity Quotas",
+    "description": "Shows remaining quotas for Antigravity models",
+    "version": "0.0.1",
+    "publisher": "truongle",
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "main": "./out/extension.js",
+    "extensionKind": [
+        "ui",
+        "workspace"
+    ],
+    "contributes": {
+        "configuration": {
+            "title": "Antigravity Quotas",
+            "properties": {
+                "antigravityQuotas.groups": {
+                    "type": "array",
+                    "default": [
+                        {
+                            "name": "Flash",
+                            "patterns": [
+                                "Flash"
+                            ]
+                        },
+                        {
+                            "name": "Pro",
+                            "patterns": [
+                                "Pro"
+                            ]
+                        },
+                        {
+                            "name": "Claude",
+                            "patterns": [
+                                "Claude",
+                                "GPT-OSS"
+                            ]
+                        }
+                    ],
+                    "description": "Groups of models to show in the StatusBar. Each group shows the lowest quota among matching models."
+                },
+                "antigravityQuotas.modelNicknames": {
+                    "type": "object",
+                    "default": {},
+                    "description": "Map of model labels to display nicknames (e.g. {'Antigravity Model X': 'AGX'})."
+                }
+            }
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "antigravity-quotas",
+                    "title": "Antigravity Quotas",
+                    "icon": "$(dashboard)"
+                }
+            ]
+        },
+        "views": {
+            "antigravity-quotas": [
+                {
+                    "id": "quota-view",
+                    "name": "Model Quotas"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "quota-view.refreshEntry",
+                "title": "Refresh Quotas",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "antigravity-quotas.show",
+                "title": "Show Quotas"
+            },
+            {
+                "command": "antigravity-quotas.setNickname",
+                "title": "Set Nickname for Model"
+            }
+        ],
+        "menus": {
+            "view/title": [
+                {
+                    "command": "quota-view.refreshEntry",
+                    "when": "view == quota-view",
+                    "group": "navigation"
+                }
+            ],
+            "commandPalette": [
+                {
+                    "command": "antigravity-quotas.show"
+                },
+                {
+                    "command": "antigravity-quotas.setNickname"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "compile": "tsc -p ./"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.75.0",
+        "@types/node": "18.x",
+        "typescript": "^5.1.3",
+        "@vscode/vsce": "^2.19.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/truongle/agq"
+    }
+}
