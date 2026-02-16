@@ -48,6 +48,16 @@
                     "type": "object",
                     "default": {},
                     "description": "Map of model labels to display nicknames (e.g. {'Antigravity Model X': 'AGX'})."
+                },
+                "antigravityQuotas.refreshInterval": {
+                    "type": "number",
+                    "default": 30,
+                    "description": "Interval in seconds to poll for quota updates."
+                },
+                "antigravityQuotas.lowQuotaThreshold": {
+                    "type": "number",
+                    "default": 20,
+                    "description": "Percentage threshold to show a low quota warning notification."
                 }
             }
         },
