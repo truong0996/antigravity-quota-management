@@ -42,6 +42,15 @@ You can customize the groups and keywords in your VS Code settings:
 ]
 ```
 
+## Security
+
+Antigravity Quotas is designed with security and privacy in mind:
+
+- **Local Communication**: The extension only communicates with the `language_server` process running on `127.0.0.1` (localhost).
+- **No External Data Transmission**: No data, credentials, or telemetry are sent to any external or unknown destinations.
+- **Secure Token Handling**: The extension dynamically retrieves the CSRF token from the local environment to authenticate with the local language server, ensuring requests are authorized without hardcoding secrets.
+- **Minimal Permissions**: The extension only requires permissions to interact with the local filesystem and network (for localhost communication).
+
 ## Requirements
 
 - Antigravity IDE
